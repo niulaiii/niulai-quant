@@ -358,6 +358,7 @@ class MyGap(Factor):
 | `qfpy/vendor/alpha_pool_transition.py` | Shadowell/Alpha | 分级股池逐级晋升校验 |
 | `qfpy/vendor/tsp_lots.py` | [shy3130/tick-stock-panel](https://github.com/shy3130/tick-stock-panel) | T+1 按批次记账、数量取整、滑点 |
 | `qfpy/vendor/tsp_price_limits.py` | tick-stock-panel | 涨跌停规则 |
+| `行情源` | [eltdx](https://github.com/electkismet/eltdx) |
 | `qfpy/vendor/tsp_signal.py` | tick-stock-panel 信号 JSON 格式 | 单票日K信号求值 |
 
 网页的配色和样式参考了 tick-stock-panel 前端的视觉风格，代码为本项目自己编写。
