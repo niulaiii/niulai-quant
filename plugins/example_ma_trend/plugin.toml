@@ -1,0 +1,4 @@
+name = "ma_trend"
+description = "示例插件（写法演示）：均线趋势 MA5 > MA10 > MA20。内置已有「均线多头排列」（ma_bull），这个只演示目录式插件怎么写"
+enabled = true
+module = "plugin"

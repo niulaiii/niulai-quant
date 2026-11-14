@@ -1,0 +1,9 @@
+name = "trade_calendar"
+description = "交易日历：把含未来日期的 A 股交易日落盘到 data/cache/trade_calendar.json，供其他插件判断交易日"
+enabled = true
+module = "plugin"
+
+# 只保留 2023 年起：日K回看 150 天、持仓几天、回测几个月，更早的用不上。
+min_year = 2023
+# 超过这个天数就联网重拉一次；另外只要日历覆盖不到当年年底（跨年）也会自动重拉。
+refresh_days = 30

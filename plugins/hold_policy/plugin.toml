@@ -1,0 +1,4 @@
+name = "hold_policy"
+description = "人工保留三种挡法：到下一次检查 / 到该交易日结束 / 到手工解除；三种都挡不住止损"
+enabled = true
+module = "plugin"

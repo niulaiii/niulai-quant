@@ -1,0 +1,16 @@
+/* ---------------- 日志与系统 ---------------- */
+let NTAB="push";
+async function notify(m){const seg=`<div class="card"><div class="row"><div class="seg">${[["push","推送记录"],["log","运行日志"],["sys","系统状态"]].map(([k,n])=>`<button class="${k===NTAB?"on":""}" onclick="NTAB='${k}';render()">${n}</button>`).join("")}</div>
+   ${NTAB==="log"?`<span style="flex:1"></span><input id="logq" placeholder="关键字过滤" value="${esc(LOGQ)}" onchange="LOGQ=this.value;render()" style="width:180px"><button class="btn small" onclick="render()">刷新</button>`:""}</div></div>`;
+  if(NTAB==="push")return show(["/api/notify/recent"],l=>{m.innerHTML=seg+`<div class="card"><h3>最近推送</h3>${l.length?`<div class="tw"><table><tr><th>时间</th><th>事件</th><th>标题</th><th>结果</th></tr>${l.map(x=>`<tr><td class="small num">${esc(x.at)}</td><td>${esc(x.event_label||x.event)}</td><td>${esc(x.title)}<details><summary>内容</summary><pre>${esc(x.body)}</pre></details></td><td class="small">${(x.results||[]).map(r=>`<span class="pill ${r.ok?"green":"red"}">${esc(r.channel)} ${esc(r.status)}</span>`).join(" ")}</td></tr>`).join("")}</table></div>`:'<div class="empty">还没有推送</div>'}</div>`});
+  if(NTAB==="log"){const p="/api/logs?n=400"+(LOGQ?"&q="+encodeURIComponent(LOGQ):"");return show([p],l=>{m.innerHTML=seg+`<div class="card"><h3>运行日志 <span class="r small mute num">${esc(l.path)} · 最后 ${l.lines.length} 行</span></h3>${l.lines.length?`<pre class="log">${esc(l.lines.slice().reverse().join("\n"))}</pre>`:'<div class="empty">日志是空的</div>'}<div class="small mute">最新的在最上面。</div></div>`})}
+  return show(["/api/status"],s=>{m.innerHTML=seg+`<div class="card"><h3>开关和模式各管什么</h3><div class="tw"><table><tr><th>开关</th><th>管什么</th><th>什么时候用</th><th>范围</th></tr>
+   ${(s.switch_docs||[]).map(d=>`<tr><td><b>${d.name}</b></td><td>${esc(d.what)}</td><td>${esc(d.when)}</td><td>${esc(d.scope)}</td></tr>`).join("")}</table></div>
+   </div>
+  <div class="card"><h3>今日定时任务</h3><div class="tw"><table><tr><th>时间</th><th>任务</th><th>今天</th></tr>${((s.schedule||{}).jobs||[]).map(j=>`<tr><td>${j.time}</td><td>${esc(j.label)}</td><td class="small">${esc(j.fired_today||"")}</td></tr>`).join("")}</table></div><div class="small mute">${esc((s.schedule||{}).note||"")} 非交易日、或无法确认是交易日时不运行。</div></div>
+  <div class="card"><h3>数据源与插件 <span class="r"><button class="btn small" onclick="reloadPlugins(this)">重新加载插件</button></span></h3>${(s.sources||[]).map(x=>`<div style="margin:3px 0"><b>${esc(x.name)}</b> <span class="pill">${esc(x.type)}</span> ${esc(x.description)} <span class="small mute">能力：${(x.capabilities||[]).join("/")}</span></div>`).join("")}
+   ${(s.plugins||[]).map(p=>`<div class="small">插件 <b>${esc(p.name||p.dir||p.file)}</b> ${p.ok?'<span class="pill green">已加载</span>':'<span class="pill red">失败</span>'} ${esc(p.description||"")} ${esc(p.error||"")}</div>`).join("")}
+   <div class="small mute" style="margin-top:6px">对外接口见 /api/v1/openapi.json 和 docs/API.md。</div></div>`})}
+let LOGQ="";
+async function reloadPlugins(b){b.disabled=true;try{const r=await api("/api/plugins/reload",{method:"POST",timeout:20000});const ps=(r&&(r.items||r.plugins))||r||[];toast(`已重新加载插件：${Array.isArray(ps)?ps.length:""} 个`);delete CACHE["/api/meta"];render()}finally{b.disabled=false}}
+

@@ -1,0 +1,55 @@
+本项目 qfpy/vendor/ 下的部分代码复制或改写自以下 MIT 许可项目，网页界面参考了其中 tick-stock-panel 的视觉风格，按 MIT 许可要求保留其版权声明与许可文本。
+
+================================================================
+1) Shadowell/Alpha  https://github.com/Shadowell/Alpha
+   用于 qfpy/vendor/alpha_pool_transition.py、qfpy/vendor/alpha_fees.py
+================================================================
+MIT License
+
+Copyright (c) 2026 Shadowell
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================
+2) shy3130/tick-stock-panel  https://github.com/shy3130/tick-stock-panel
+   用于 qfpy/vendor/tsp_price_limits.py、qfpy/vendor/tsp_signal.py、qfpy/vendor/tsp_lots.py、qfpy/plugins.py
+   以及 qfpy/web/index.html：网页界面的配色变量、深浅主题切换、侧栏导航和卡片/徽章样式参考其前端视觉风格
+   （单文件 HTML 自行编写，未复制其 React 组件）
+================================================================
+MIT License
+
+Copyright (c) 2026 tick-stock-panel contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

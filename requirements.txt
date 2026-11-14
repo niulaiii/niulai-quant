@@ -1,0 +1,7 @@
+httpx>=0.27
+tomlkit>=0.12
+fastapi>=0.110
+uvicorn>=0.27
+tzdata>=2024.1        # Windows 上 zoneinfo 需要
+akshare>=1.14         # 可选：免费行情（分时/日K/涨停池）。不装也能跑，只是少了日K相关功能
+eltdx>=3.3.5          # 可选：通达信 7709 行情（首选数据源，插件 plugins/eltdx_source.py）。不装也能跑，自动回退 akshare

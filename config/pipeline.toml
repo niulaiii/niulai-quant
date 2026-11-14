@@ -1,0 +1,345 @@
+# 牛来量化 配置文件。网页「设置」页里改了保存后会写回本文件并立即生效（不用重启）。
+# 例外：监听地址 [web] 和数据目录 data_dir 只能在这里手改。
+# 运行模式（模拟盘 / 演练 / 实盘）在网页「设置 → 运行模式」直接切换；单笔上限、每日笔数等风控在「仓位与风控」里改。
+
+data_dir = "data"          # 缓存、运行记录、模拟盘、风控计数、开关状态都放这里
+
+# ---------------- 数据源（可插拔） ----------------
+# 每个 [sources.<名字>] 是一个数据源实例，type 决定实现：gushi / watchlist / akshare，插件也可以注册新 type。
+[pool]
+# 前池 = 下面这些股池合并去重。格式“数据源:股池key”；一只票被几个股池选中，hit_count 就是几。
+# gushi: auction_long 竞价多头 / morning_star 晨星量化 / auction_alpha 竞价阿尔法 / gold_230 黄金两点半 / half_past_ten 十点半
+# watchlist: all 自选股全部
+# akshare: zt_pool 涨停池 / strong_pool 强势股池
+pools = ["gushi:auction_long", "gushi:morning_star", "gushi:auction_alpha", "watchlist:all"]
+archive = true                  # 每天把每个股池的成分股存档到 data/pool_archive（按股池回测要用）
+archive_time = "15:10"          # 交易日几点做一次全量存档（每次选股运行时也会顺手存当时拉到的成分股）
+
+# 股池绑定策略（可选）：每个股池用自己的买入/卖出策略，没写的用当前生效的那套。网页「买入 → 股池绑定策略」里点选即可。
+# 一只票同时在几个池里时，按这里的顺序取第一个；卖出看买入时记下的来源股池。详见 docs/GUIDE.md「股池绑定策略」。
+# [pool.bind."gushi:gold_230"]
+# buy = "策略 id"
+# sell = "策略 id"
+entry_mode = "new"
+entry_scope = "day"
+priority = ["gushi:auction_long", "gushi:auction_alpha", "gushi:morning_star", "watchlist:all"]
+
+[pool.bind]
+
+[pool.bind."gushi:auction_long"]
+sell = "current"
+
+[pool.bind."watchlist:all"]
+buy = "current"
+[pool.entry_scope_by_pool]
+
+[market]
+minute_sources = ["eltdx", "gushi", "akshare"]   # 分时按顺序尝试，前一个失败自动用下一个（eltdx 直连通达信 7709，最快）
+daily_sources = ["eltdx", "akshare"]             # 日K（用于表达式回看 N 天前、均线、信号条件、回测）
+daily_lookback_days = 150               # 拉多少个自然日的日K（够算 MA60）
+quote_sources = ["eltdx", "akshare"]             # 实时行情 / 指数 / 指数分时 / 市场情绪，按顺序尝试（可加「标准接口」数据源）
+
+# ---------------- 首页（大盘行情 + 股池走势） ----------------
+[home]
+indices = ["000001.SH", "399001.SZ", "399006.SZ", "000688.SH", "000300.SH"]   # 上证、深证成指、创业板指、科创50、沪深300
+pool_days = 5          # 股池走势回看几个交易日的运行记录
+refresh_secs = "5"      # 首页行情：交易时段多久自动刷新一次（秒）；非交易时段 5 分钟一次
+
+# ---------------- 买入漏斗（可自定义层级） ----------------
+# 候选逐层过滤；每层放一个或多个因子，mode = "all" 全部满足 / "any" 任一满足；enabled 可以整层或单个因子关掉。
+# 网页「漏斗」页能直接增删层、拖顺序、改参数、套模板（竞价强势 / 尾盘黄金两点半 / 稳健低吸 / 只用表达式）。
+# 因子类型见网页「漏斗 → 因子库」或 GET /api/v1/factors；插件（plugins/*.py）注册的因子也能放进来。
+[[buy_funnel.layers]]
+id = "hard"
+name = "硬性过滤"
+mode = "all"
+[[buy_funnel.layers.factors]]
+kind = "exclude_st"
+[[buy_funnel.layers.factors]]
+kind = "exclude_board"
+params = { boards = ["star", "bse"] }
+[[buy_funnel.layers.factors]]
+kind = "range"
+label = "市值 30~800 亿"
+params = { field = "market_value", min = 30, max = 800, unit = "亿", missing = "pass" }   # missing = "pass"：拿不到市值（如自选股）时放行
+
+[[buy_funnel.layers]]
+id = "open"
+name = "高开不跳水"
+mode = "all"
+[[buy_funnel.layers.factors]]
+kind = "expr"
+label = "高开且未跳水"
+params = { expr = "open_rise >= 0 and change_rate >= open_rise - 1" }
+
+[[buy_funnel.layers]]
+id = "strength"
+name = "盘中强度"
+mode = "all"
+[[buy_funnel.layers.factors]]
+kind = "not_limit_up"
+params = { buffer_pct = 1.0 }
+[[buy_funnel.layers.factors]]
+kind = "above_vwap"
+params = { min_dev_pct = 0.0 }
+[[buy_funnel.layers.factors]]
+kind = "max_drawdown"
+params = { max_pct = 4.0 }
+[[buy_funnel.layers.factors]]
+kind = "min_amount"
+params = { min_yi = 1.0 }
+
+[[buy_funnel.layers]]
+id = "extra"
+name = "加分条件（任一，默认关）"
+mode = "any"
+enabled = false
+[[buy_funnel.layers.factors]]
+kind = "min_hits"
+params = { min = 2 }
+[[buy_funnel.layers.factors]]
+kind = "expr"
+label = "站上 5 日线且昨天还在线下（日K回看）"
+params = { expr = "close > ma5 and close[1] <= ma5[1]" }
+[[buy_funnel.layers.factors]]
+kind = "signal"
+label = "放量（tick-stock-panel 信号）"
+params = { file = "config/signals/volume_surge.json" }
+
+# ---------------- 卖出因子链（对持仓逐只检查） ----------------
+# 和买入漏斗对称：每层一个或多个卖出因子，某层「成立」就卖，原因 = 第一个成立的层。
+# 含「止损」因子的层永远最先检查，默认不能被人工保留跳过（[exits].hold_can_skip_stop_loss）。
+# 止损/止盈/持有天数/到点卖出的参数留空 = 按下面 [exits] 取值（含按股池覆盖）。
+# 卖出因子：stop_loss 止损、take_profit 止盈、hold_days 持有天数、time_reached 到点卖出、below_vwap 跌破均价线、
+#           drawdown_from_high 从高点回撤、below_ma 跌破均线、expr 表达式（可用 pnl_pct/held_days 等持仓字段）、external/http 外部因子
+[[sell_funnel.layers]]
+id = "stop_loss"
+name = "止损"
+mode = "any"
+enabled = true
+
+[[sell_funnel.layers.factors]]
+kind = "stop_loss"
+params = {pct = 3}
+
+[[sell_funnel.layers]]
+id = "weak"
+name = "走弱"
+mode = "all"
+enabled = true
+
+[[sell_funnel.layers.factors]]
+kind = "below_vwap"
+params = {min_below_pct = 1, after = "10:00"}
+
+[[sell_funnel.layers.factors]]
+kind = "expr"
+label = "浮盈 < 1%"
+params = {expr = "pnl_pct < 1"}
+
+[[sell_funnel.layers]]
+id = "time"
+name = "到期退出"
+mode = "all"
+enabled = true
+
+[[sell_funnel.layers.factors]]
+kind = "hold_days"
+
+[[sell_funnel.layers.factors]]
+kind = "time_reached"
+[select]
+top_n = 2
+[select.weights]
+
+[sizing]
+per_stock_amount = 5000        # 每只计划金额（元），股数向下取整到一手
+buy_price_offset_pct = 0.3     # 买入限价 = 参考价 × (1 + 0.3%)，不超过涨停价
+sell_price_offset_pct = 0.3    # 卖出限价 = 参考价 × (1 - 0.3%)，不低于跌停价
+
+[execution]
+mode = "paper"                 # paper 模拟盘 / dry_run 演练（只生成请求不发送）/ live 实盘（需三重开关）
+
+[automation]
+default_enabled = false        # 自动交易开关的初始值；之后以网页/命令行切换的状态为准（存在 data/state/automation.json）
+
+[risk]                          # 对所有模式生效
+max_order_amount = 10000        # 单笔买入上限（元）；卖单不受限
+max_daily_orders = 0            # 已停用：不限制每日委托笔数（保留这一行只为兼容旧配置，填多少都不生效）
+max_daily_amount = 30000        # 每日买入总金额上限（元）；卖单不计入、也不受限
+whitelist = []                  # 非空时只允许买入这些代码（卖出不受限）
+blacklist = []                  # 永远不允许
+enforce_session = true          # 交易时段检查（实盘强制开启）
+sessions = [["09:30", "11:30"], ["13:00", "14:57"]]
+max_price_deviation_pct = 3.0   # 限价偏离参考价不超过 3%
+one_buy_per_symbol_per_day = true
+max_per_industry = 0
+
+[paper]
+initial_cash = 100000
+commission_rate = 0.00025
+min_commission = 5
+stamp_tax_rate = 0.0005         # 印花税仅卖出
+slippage_rate = 0.001
+ignore_session = true           # 模拟盘允许收盘后用回放数据演示
+
+[live]
+enabled = false                 # 旧字段，已不起作用：是否实盘只看 [execution].mode
+base_url = "http://127.0.0.1:8765"      # 下单程序地址：填下单程序所在电脑的地址和端口
+timeout_secs = 12               # 旧字段：/api/order 超时（新版按接口分别设，见 [live.timeouts]）
+arm_env = "QF_LIVE_ARMED"       # 旧字段，已不起作用（不再需要这个环境变量）
+arm_value = "I_ACCEPT_REAL_MONEY_RISK"
+# 下单程序口令（请求头 X-Auth = base64(口令)）。推荐用环境变量 QF_XIADAN_PASSWORD，不写进文件；
+# 两者都设时环境变量优先；都为空则不带 X-Auth（只适用于下单程序 --trade-password ""）。
+auth_env = "QF_XIADAN_PASSWORD"
+auth_password = ""
+# 后台监控：查连接状态、读券商快照、实盘自动对账（只调只读接口）
+monitor = true
+poll_secs = 20                  # 交易时段每 20 秒查一次 /api/status
+idle_poll_secs = 300            # 非交易时段每 5 分钟
+reconcile_secs = 60             # 连上时每 60 秒读一次 /api/snapshot（多半命中下单程序缓存，几十毫秒）
+full_refresh_secs = 120         # 有在途委托/对不上时，最多每 120 秒一次 refresh=1 强制重扫
+
+[live.timeouts]                 # 各接口超时（秒），按接口文档的耗时参考设置
+status = 5
+snapshot = 15                   # 无缓存兜底渲染 8~10 秒
+snapshot_sync = 6               # 下单/撤单后的 refresh=1&no_render=1，约 1 秒
+refresh = 25                    # 委托为空时会切页补渲染，12~17 秒
+requery = 50                    # 子进程脚本自身超时 45 秒
+order = 20
+cancel = 15
+
+[live.reconcile]
+not_found_grace_secs = 180      # 委托发出后这么久还在券商委托里找不到，才开始按持仓变化判断
+mismatch_confirmations = 2      # 持仓数量连续对不上几次（每次都是强制重扫的数据）才标“结果未知”并推送
+mismatch_min_gap_secs = 60      # 两次计数之间至少隔多久（下单程序持仓缓存最长 120 秒）
+adopt_broker_cost = true        # 对账一致时用券商的成本价（含费用）更新本地成本
+
+# ---------------- 退出规则（卖出）和人工保留 ----------------
+
+[live.min_interval_secs]
+[exits]
+enabled = true
+take_profit_pct = 5.0           # 浮盈 ≥ 5% 卖出（每次检查都看）
+stop_loss_pct = 3.0             # 浮亏 ≥ 3% 卖出（每次检查都看）
+max_hold_days = 3               # 持有满 N 个交易日，在当天 exit_time 卖出（0 = 不按时间退出）
+exit_time = "14:50"             # 到期卖出的时刻
+check_times = ["09:35", "10:30", "13:30"]   # 另外这些时刻检查止盈止损（exit_time 自动加入）
+remind_minutes_before = 5       # 退出时间前几分钟推送“即将卖出”提醒，方便决定要不要保留
+hold_can_skip_stop_loss = false # 人工保留能否跳过止损（默认不能，见 README）
+
+# 按策略覆盖退出规则：持仓按买入时命中的第一个有覆盖配置的股池生效
+
+[exits.by_pool]
+[api]
+enabled = false
+token = ""
+token_env = "QF_API_TOKEN"
+allow_config_write = true       # false = 外部只能读，不能改漏斗/数据源配置
+
+[web]
+host = "127.0.0.1"              # 只监听本机，用 SSH 端口转发访问
+port = 8081
+
+[schedule]                      # serve 运行期间，交易日在各策略时段内自动跑完整链路（是否下单由自动交易开关决定）
+enabled = true
+retry_secs = 60                 # 时段内股池还没出数据时，每隔多少秒重试
+backfill = true                 # 启动时补录当天已过时段、还没跑过的策略（记录标为「补录」）
+backfill_trade = false          # 补录结果是否下单：默认不下单（时段已过、价格已变）
+
+# 牛来（gushi）各策略的默认运行时段，网页「设置 → 定时任务」可改
+[[schedule.runs]]
+name = "竞价策略"
+start = "09:27"
+end = "09:35"
+pools = ["gushi:auction_long", "gushi:auction_alpha", "gushi:morning_star", "watchlist:all"]
+
+[[schedule.runs]]
+name = "十点半"
+start = "10:30"
+end = "10:35"
+pools = ["gushi:half_past_ten"]
+
+[[schedule.runs]]
+name = "黄金两点半"
+start = "14:30"
+end = "14:35"
+pools = ["gushi:gold_230"]
+
+# ---------------- 推送 ----------------
+[notify]
+enabled = false
+channels = ["dingtalk"]         # 启用哪些渠道（可多个）；没填 token 的渠道只打印到日志
+
+[notify.events]                 # 哪些事件要推送
+run_result = true               # 选股结果
+order = true                    # 模拟/演练/实盘委托
+risk_reject = true              # 风控拦截
+unknown = true                  # 结果未知需人工核对
+error = true                    # 报错
+signal_only = true              # 自动交易关闭时“本应下单”的信号
+exit_reminder = true            # 退出前提醒
+hold_skip = true                # 人工保留跳过卖出
+manual_needed = true            # 持仓状态不确定、需要人工处理
+exit_problem = true             # 止损/卖出检查没法判断（没有最新价、因子出错、止损层数据缺失）
+switch = true                   # 自动交易开关、一键停止切换
+
+[notify.dingtalk]               # 默认渠道：钉钉群机器人（也可用环境变量 QF_DINGTALK_WEBHOOK / QF_DINGTALK_SECRET）
+webhook = ""                    # https://oapi.dingtalk.com/robot/send?access_token=...
+secret = ""                     # 安全设置选「加签」时的 SEC 开头密钥
+keyword = ""                    # 安全设置选「自定义关键词」时填，会加到每条消息前
+at_mobiles = []                 # 需要 @ 的手机号（可空）
+
+[notify.pushplus]
+token = ""
+
+[notify.serverchan]
+sendkey = ""
+
+[notify.wecom]
+webhook = ""
+
+[notify.feishu]
+webhook = ""
+secret = ""
+
+[notify.telegram]
+bot_token = ""
+chat_id = ""
+proxy = ""                      # 国内网络一般需要代理，如 http://127.0.0.1:7890
+
+[pool_sources.gushi]
+type = "gushi"
+enabled = true
+base_url = "https://www.gushi.in"
+key = ""                    # 请填自己的 gushi.in key；别把密钥提交进仓库
+min_interval_ms = 1600
+cache_ttl_secs = 60
+
+[pool_sources.watchlist]
+type = "watchlist"
+enabled = true
+codes = ["300825", "600519"]
+csv = "config/watchlist.csv"
+
+[market_sources.akshare]
+type = "akshare"
+enabled = true
+min_interval_ms = 600
+cache_ttl_secs = 60
+
+# 首选行情源：eltdx 通达信 7709（插件 plugins/eltdx_source.py 注册 type="eltdx"）。
+# 不装 / 连不上 / 连续失败时自动熔断 5 分钟并回退到 akshare，不影响系统运行。
+[market_sources.eltdx]
+type = "eltdx"
+enabled = true
+timeout_secs = 3                # 7709 单次请求超时（秒）
+cache_ttl_secs = 60             # 当天分时 / 日K / 市场情绪缓存秒数
+min_interval_ms = 0             # 直连主站，不需要限速门控
+# host = "119.147.212.81:7709"  # 可选：手动指定主站；留空 = 自动测速选最快
+
+# 历史行情缓存自动清理（插件 plugins/cache_pruner）。网页「设置 → 插件」里可直接改这两项。
+# 只处理 data/cache/ 下按日期切分的行情缓存；这里不配时以插件的 plugin.toml 默认值为准。
+[cache_pruner]
+keep_days = 30                  # 只保留最近多少天；0 = 完全不清理
+dry_run = true                  # true = 只出报告不删文件；改成 false 才真删

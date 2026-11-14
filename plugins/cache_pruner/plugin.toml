@@ -1,0 +1,20 @@
+name = "cache_pruner"
+description = "历史行情缓存自动清理：按目录日期只保留最近 N 天，主程序零改动"
+enabled = true
+module = "plugin"
+
+# 只保留最近多少天的「按日期切分」的行情缓存，例如：
+#   data/cache/akshare/minute/20261113/600000.json
+#   data/cache/gushi/pools/2026-11-13/pool.json
+#   data/cache/pool_minute/2026-11-13/600519.json
+# 0 或留空 = 完全不跑（插件只记一条日志，不删任何文件）。
+keep_days = 30
+
+# 安全开关：true = 只出报告、不删文件。看过报告确认无误后改成 false 才真删。
+# 状态/报告在 data/cache_pruner/state.json，日志里搜「历史缓存清理」。
+dry_run = true
+
+# 上面两项是「兜底默认值」。网页「设置 → 插件」里改的值写在
+# config/pipeline.toml 的 [cache_pruner] 段，会覆盖这里；插件每次检查都重新读盘，
+# 所以改完下一轮自动生效，不用重启、不用重新加载插件。只改这份文件则作为没有
+# 网页配置时的默认值。
